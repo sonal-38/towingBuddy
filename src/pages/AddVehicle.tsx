@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import AdminHeader from "@/components/AdminHeader";
+import AppHeader from "@/components/AppHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,29 +26,6 @@ const AddVehicle = () => {
     fine: "",
     reason: "",
   });
-
-  const handleVehicleNumberChange = (value: string) => {
-    setVehicleNumber(value);
-    
-    // Clear previous data when vehicle number changes
-    if (value.length < 8) {
-      setOwnerDetails({
-        name: "",
-        phone: "",
-        model: "",
-      });
-      return;
-    }
-    
-    // Simulate auto-fetch owner details with realistic data based on vehicle number
-    if (value.length >= 8) {
-      setTimeout(() => {
-        // Simulate different responses based on vehicle number
-        const vehicleData = getVehicleData(value);
-        setOwnerDetails(vehicleData);
-      }, 800);
-    }
-  };
 
   // Simulate database lookup for vehicle owner details
   const getVehicleData = (vehicleNumber: string) => {
@@ -86,6 +63,29 @@ const AddVehicle = () => {
     };
   };
 
+  const handleVehicleNumberChange = (value: string) => {
+    setVehicleNumber(value);
+    
+    // Clear previous data when vehicle number changes
+    if (value.length < 8) {
+      setOwnerDetails({
+        name: "",
+        phone: "",
+        model: "",
+      });
+      return;
+    }
+    
+    // Simulate auto-fetch owner details with realistic data based on vehicle number
+    if (value.length >= 8) {
+      setTimeout(() => {
+        // Simulate different responses based on vehicle number
+        const vehicleData = getVehicleData(value);
+        setOwnerDetails(vehicleData);
+      }, 800);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -103,7 +103,12 @@ const AddVehicle = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminHeader />
+      <AppHeader 
+        showBackButton={true} 
+        backTo="/admin/dashboard"
+        title="Add Towing Record"
+        subtitle="Register new vehicle towing"
+      />
       
       <main className="p-6">
         <div className="max-w-4xl mx-auto space-y-6">
