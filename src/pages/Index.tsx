@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Shield, Car, Users, BarChart3, MapPin, CreditCard } from "lucide-react";
+import AppFooter from "@/components/AppFooter";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-primary">
+    <div className="min-h-screen bg-gradient-primary flex flex-col">
       <div className="absolute inset-0 bg-black/5"></div>
       
       {/* Hero Section */}
@@ -126,6 +127,7 @@ const Index = () => {
           </Card>
         </div>
       </div>
+      <AppFooter />
     </div>
   );
 };

@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, Shield, Phone, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AppHeader from "@/components/AppHeader";
+import AppFooter from "@/components/AppFooter";
 
 const UserLogin = () => {
   const [phone, setPhone] = useState("");
@@ -46,8 +48,10 @@ const UserLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-success flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/5"></div>
+    <div className="min-h-screen bg-gradient-success flex flex-col">
+      <AppHeader />
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/5"></div>
       
       <Card className="w-full max-w-md relative z-10 shadow-elegant">
         <CardHeader className="text-center space-y-4">
@@ -153,6 +157,8 @@ const UserLogin = () => {
           </div>
         </CardContent>
       </Card>
+      </div>
+      <AppFooter />
     </div>
   );
 };

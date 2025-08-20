@@ -30,16 +30,60 @@ const AddVehicle = () => {
   const handleVehicleNumberChange = (value: string) => {
     setVehicleNumber(value);
     
-    // Simulate auto-fetch owner details
+    // Clear previous data when vehicle number changes
+    if (value.length < 8) {
+      setOwnerDetails({
+        name: "",
+        phone: "",
+        model: "",
+      });
+      return;
+    }
+    
+    // Simulate auto-fetch owner details with realistic data based on vehicle number
     if (value.length >= 8) {
       setTimeout(() => {
-        setOwnerDetails({
-          name: "Rajesh Kumar",
-          phone: "+91 9876543210",
-          model: "Maruti Swift VDI",
-        });
-      }, 500);
+        // Simulate different responses based on vehicle number
+        const vehicleData = getVehicleData(value);
+        setOwnerDetails(vehicleData);
+      }, 800);
     }
+  };
+
+  // Simulate database lookup for vehicle owner details
+  const getVehicleData = (vehicleNumber: string) => {
+    const mockDatabase = {
+      "MH12AB1234": {
+        name: "Rajesh Kumar",
+        phone: "+91 9876543210",
+        model: "Maruti Swift VDI",
+      },
+      "DL01BC5678": {
+        name: "Priya Sharma", 
+        phone: "+91 9123456789",
+        model: "Hyundai i20 Sportz",
+      },
+      "KA03CD9012": {
+        name: "Amit Patel",
+        phone: "+91 8765432109", 
+        model: "Honda City ZX",
+      },
+      "TN09EF3456": {
+        name: "Lakshmi Reddy",
+        phone: "+91 7890123456",
+        model: "Toyota Innova Crysta",
+      }
+    };
+
+    // Remove spaces and convert to uppercase for lookup
+    const cleanNumber = vehicleNumber.replace(/\s+/g, '').toUpperCase();
+    
+    // Return data if found, otherwise return default
+    return mockDatabase[cleanNumber] || {
+      name: "Vehicle Owner",
+      phone: "+91 9000000000", 
+      model: "Unknown Model",
+    };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
