@@ -4,6 +4,32 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Car, Users, DollarSign, AlertTriangle, Plus, Edit, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+type RawVehicle = {
+  _id?: string;
+  plateNumber?: string;
+  vehicleNumber?: string;
+  owner?: { name?: string; ownerName?: string; phone?: string; model?: string };
+  ownerName?: string;
+  towedFrom?: string;
+  towedTo?: string;
+  fine?: number;
+  status?: string;
+  createdAt?: string;
+  date?: string;
+};
+
+type VehicleRecord = {
+  id: string | number;
+  vehicleNumber: string;
+  ownerName: string;
+  towedFrom: string;
+  towedTo: string;
+  fine: number;
+  status: string;
+  date: string;
+};
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -43,38 +69,56 @@ const AdminDashboard = () => {
     },
   ];
 
-  const recentTowings = [
-    {
-      id: 1,
-      vehicleNumber: "MH 12 AB 1234",
-      ownerName: "Rajesh Kumar",
-      towedFrom: "Airport Road",
-      towedTo: "City Depot",
-      fine: 2500,
-      status: "unpaid",
-      date: "Today, 2:30 PM",
-    },
-    {
-      id: 2,
-      vehicleNumber: "MH 14 CD 5678",
-      ownerName: "Priya Sharma",
-      towedFrom: "Mall Parking",
-      towedTo: "Central Depot",
-      fine: 1500,
-      status: "paid",
-      date: "Today, 11:15 AM",
-    },
-    {
-      id: 3,
-      vehicleNumber: "MH 01 EF 9012",
-      ownerName: "Amit Patel",
-      towedFrom: "Bus Stop",
-      towedTo: "North Depot",
-      fine: 3000,
-      status: "unpaid",
-      date: "Yesterday, 6:45 PM",
-    },
-  ];
+  const [recentTowings, setRecentTowings] = useState<VehicleRecord[]>([]);
+  const [loadingTowings, setLoadingTowings] = useState<boolean>(true);
+
+  const formatPlate = (plate?: string) => {
+    if (!plate) return '';
+    const cleaned = plate.replace(/\s+/g, '').toUpperCase();
+    // try simple India-like formatting: XXNNXXNNNN -> XX NN XX NNNN
+    const m = cleaned.match(/^([A-Z]{2})(\d{1,2})([A-Z]{1,2})(\d{1,4})$/);
+    if (m) return `${m[1]} ${m[2]} ${m[3]} ${m[4]}`;
+    return plate;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchRecent = async () => {
+      try {
+        const env = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
+        const apiBase = env?.VITE_API_URL || 'http://localhost:5000';
+        const res = await fetch(`${apiBase}/api/vehicles?limit=10&page=1`);
+        if (!res.ok) {
+          console.error('Failed to fetch vehicles', res.statusText);
+          setRecentTowings([]);
+          setLoadingTowings(false);
+          return;
+        }
+        const json = await res.json();
+        // backend returns { vehicles: [...], total, page, limit }
+        const vehicles = Array.isArray(json?.vehicles) ? json.vehicles : [];
+        if (!mounted) return;
+        setRecentTowings(vehicles.map((v: RawVehicle, idx: number): VehicleRecord => ({
+          id: v._id || idx,
+          vehicleNumber: formatPlate(v.plateNumber || v.vehicleNumber || ''),
+          ownerName: v.owner?.name || v.ownerName || v.owner?.ownerName || '-',
+          towedFrom: v.towedFrom || '',
+          towedTo: v.towedTo || '',
+          fine: v.fine || 0,
+          status: v.status || 'unpaid',
+          date: v.createdAt ? new Date(v.createdAt).toLocaleString() : (v.date || ''),
+        })));
+      } catch (err) {
+        console.error('Error fetching recent towings', err);
+        if (mounted) setRecentTowings([]);
+      } finally {
+        if (mounted) setLoadingTowings(false);
+      }
+    };
+
+    fetchRecent();
+    return () => { mounted = false; };
+  }, []);
 
   const getStatusBadge = (status: string) => {
     if (status === "paid") {
@@ -146,40 +190,50 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentTowings.map((record) => (
-                      <tr key={record.id} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="font-medium">{record.vehicleNumber}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium">{record.ownerName}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm">
-                            {record.towedFrom} → {record.towedTo}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium">₹{record.fine.toLocaleString()}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          {getStatusBadge(record.status)}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="text-sm text-muted-foreground">{record.date}</div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </td>
+                    {loadingTowings ? (
+                      <tr>
+                        <td colSpan={7} className="py-6 px-4 text-center text-muted-foreground">Loading recent towings…</td>
                       </tr>
-                    ))}
+                    ) : recentTowings.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-6 px-4 text-center text-muted-foreground">No recent towing records</td>
+                      </tr>
+                    ) : (
+                      recentTowings.map((record) => (
+                        <tr key={record.id} className="border-b hover:bg-muted/50 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{record.vehicleNumber}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{record.ownerName}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-sm">
+                              {record.towedFrom} → {record.towedTo}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium">₹{Number(record.fine).toLocaleString()}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {getStatusBadge(record.status)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="text-sm text-muted-foreground">{record.date}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm">
+                                <Eye className="w-3 h-3" />
+                              </Button>
+                              <Button variant="ghost" size="sm">
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

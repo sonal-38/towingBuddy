@@ -1,50 +1,101 @@
+import { useState, useEffect } from "react";
 import UserHeader from "@/components/UserHeader";
+import TowingLocationMap from "@/components/TowingLocationMap";
+import PayPalPayment from "@/components/PayPalPayment";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Car, MapPin, CreditCard, Clock, History, Search, Navigation } from "lucide-react";
+import { Car, MapPin, CreditCard, Clock, History, Search, Navigation, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+
+interface TowingRecord {
+  _id: string;
+  plateNumber: string;
+  towedFrom: string;
+  towedTo: string;
+  fine: number;
+  reason: string;
+  createdAt: string;
+  paymentStatus?: string;
+  paymentId?: string;
+  paidAt?: string;
+  owner?: {
+    name: string;
+    phone: string;
+    model: string;
+  };
+}
+
+interface VehicleInfo {
+  number: string;
+  model: string;
+  owner: string;
+  phone: string;
+}
 
 const UserDashboard = () => {
-  const vehicleInfo = {
-    number: "MH 12 AB 1234",
-    model: "Maruti Swift",
-    owner: "Rajesh Kumar",
-    phone: "+91 9876543210",
-  };
+  const [towingRecords, setTowingRecords] = useState<TowingRecord[]>([]);
+  const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  const currentTowing = {
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+  useEffect(() => {
+    // Get towing records from sessionStorage (set during OTP verification)
+    const storedVehicles = sessionStorage.getItem('towing_vehicles');
+    if (storedVehicles) {
+      try {
+        const vehicles = JSON.parse(storedVehicles);
+        setTowingRecords(vehicles);
+        
+        // Extract vehicle info from the first record
+        if (vehicles.length > 0) {
+          const firstRecord = vehicles[0];
+          setVehicleInfo({
+            number: firstRecord.plateNumber,
+            model: firstRecord.owner?.model || 'Unknown Model',
+            owner: firstRecord.owner?.name || 'Unknown Owner',
+            phone: firstRecord.owner?.phone || 'Unknown Phone'
+          });
+        }
+      } catch (err) {
+        console.error('Error parsing stored vehicles:', err);
+        toast({
+          title: 'Error',
+          description: 'Failed to load vehicle data',
+          variant: 'destructive'
+        });
+      }
+    }
+    setLoading(false);
+  }, [toast]);
+
+  // Get the most recent towing record as "current"
+  const currentTowing = towingRecords.length > 0 ? {
     status: "towed",
-    towedFrom: "Airport Road, Near Terminal 2",
-    towedTo: "City Central Depot",
-    fine: 2500,
-    reason: "No Parking Zone Violation",
-    towedAt: "Today, 2:30 PM",
-    fineStatus: "unpaid",
-  };
+    towedFrom: towingRecords[0].towedFrom,
+    towedTo: towingRecords[0].towedTo,
+    fine: towingRecords[0].fine,
+    reason: towingRecords[0].reason,
+    towedAt: new Date(towingRecords[0].createdAt).toLocaleString(),
+    fineStatus: towingRecords[0].paymentStatus || "unpaid",
+    paymentId: towingRecords[0].paymentId,
+    paidAt: towingRecords[0].paidAt,
+  } : null;
 
-  const towingHistory = [
-    {
-      id: 1,
-      date: "15 Jan 2024",
-      towedFrom: "Mall Parking",
-      towedTo: "Central Depot",
-      fine: 1500,
-      status: "paid",
-      reason: "Overtime Parking",
-      paidAt: "16 Jan 2024",
-    },
-    {
-      id: 2,
-      date: "28 Dec 2023",
-      towedFrom: "Bus Stop",
-      towedTo: "North Depot",
-      fine: 3000,
-      status: "paid",
-      reason: "Blocking Public Transport",
-      paidAt: "29 Dec 2023",
-    },
-  ];
+  // Use all records as history
+  const towingHistory = towingRecords.map((record, index) => ({
+    id: record._id,
+    date: new Date(record.createdAt).toLocaleDateString(),
+    towedFrom: record.towedFrom,
+    towedTo: record.towedTo,
+    fine: record.fine,
+    status: record.paymentStatus || "unpaid",
+    reason: record.reason,
+    paidAt: record.paidAt ? new Date(record.paidAt).toLocaleDateString() : null,
+  }));
 
   const getStatusBadge = (status: string) => {
     if (status === "paid") {
@@ -52,6 +103,41 @@ const UserDashboard = () => {
     }
     return <Badge className="bg-warning text-warning-foreground">Unpaid</Badge>;
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading vehicle data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!vehicleInfo || towingRecords.length === 0) {
+    return (
+      <div className="min-h-screen bg-background">
+        <UserHeader />
+        <main className="p-6">
+          <div className="max-w-6xl mx-auto">
+            <Card className="shadow-card">
+              <CardContent className="p-8 text-center">
+                <Car className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No Vehicle Data Found</h3>
+                <p className="text-muted-foreground mb-4">
+                  Please login with your vehicle number to view towing records.
+                </p>
+                <Button onClick={() => window.location.href = '/user/login'}>
+                  Go to Login
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,98 +169,132 @@ const UserDashboard = () => {
           </Card>
 
           <Tabs defaultValue="current" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="current">Current Status</TabsTrigger>
               <TabsTrigger value="location">Search Location</TabsTrigger>
+              <TabsTrigger value="payment">Pay Fine</TabsTrigger>
               <TabsTrigger value="history">Past History</TabsTrigger>
             </TabsList>
 
             <TabsContent value="current" className="space-y-4">
               {/* Current Towing Status */}
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-warning" />
-                    Current Towing Status
-                  </CardTitle>
-                  <CardDescription>Your vehicle is currently towed</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Towed From</label>
-                        <p className="text-sm">{currentTowing.towedFrom}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Towed To</label>
-                        <p className="text-sm">{currentTowing.towedTo}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Reason</label>
-                        <p className="text-sm">{currentTowing.reason}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Fine Amount</label>
-                        <p className="text-xl font-bold">₹{currentTowing.fine.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Status</label>
-                        <div className="mt-1">
-                          {getStatusBadge(currentTowing.fineStatus)}
+              {currentTowing ? (
+                <Card className="shadow-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-warning" />
+                      Current Towing Status
+                    </CardTitle>
+                    <CardDescription>Your vehicle is currently towed</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Towed From</label>
+                          <p className="text-sm">{currentTowing.towedFrom}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Towed To</label>
+                          <p className="text-sm">{currentTowing.towedTo}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Reason</label>
+                          <p className="text-sm">{currentTowing.reason}</p>
                         </div>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Towed At</label>
-                        <p className="text-sm">{currentTowing.towedAt}</p>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Fine Amount</label>
+                          <p className="text-xl font-bold">₹{currentTowing.fine.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Status</label>
+                          <div className="mt-1">
+                            {getStatusBadge(currentTowing.fineStatus)}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Towed At</label>
+                          <p className="text-sm">{currentTowing.towedAt}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {currentTowing.fineStatus === "unpaid" && (
-                    <div className="pt-4 border-t">
-                      <Button className="w-full md:w-auto bg-gradient-success hover:shadow-glow transition-all duration-300">
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Pay Fine - ₹{currentTowing.fine.toLocaleString()}
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    
+                    {currentTowing.fineStatus === "unpaid" && (
+                      <div className="pt-4 border-t">
+                        <Button className="w-full md:w-auto bg-gradient-success hover:shadow-glow transition-all duration-300">
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Pay Fine - ₹{currentTowing.fine.toLocaleString()}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="shadow-card">
+                  <CardContent className="p-8 text-center">
+                    <Car className="w-16 h-16 mx-auto text-success mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No Active Towing</h3>
+                    <p className="text-muted-foreground">
+                      Your vehicle is not currently towed. Check the history tab for past records.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="location" className="space-y-4">
-              {/* Vehicle Location Search */}
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-primary" />
-                    Vehicle Location
-                  </CardTitle>
-                  <CardDescription>Find where your vehicle is currently located</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="bg-muted/50 rounded-lg p-6 text-center">
-                    <Navigation className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="font-medium mb-2">Interactive Map Coming Soon</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      View real-time location of your towed vehicle on an interactive map
+              {/* Vehicle Location Map */}
+              {currentTowing ? (
+                <TowingLocationMap 
+                  towedTo={currentTowing.towedTo}
+                  towedFrom={currentTowing.towedFrom}
+                  vehicleNumber={vehicleInfo?.number}
+                />
+              ) : (
+                <Card className="shadow-card">
+                  <CardContent className="p-8 text-center">
+                    <Car className="w-16 h-16 mx-auto text-success mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No Active Towing</h3>
+                    <p className="text-muted-foreground">
+                      Your vehicle is not currently towed. Check the history tab for past records.
                     </p>
-                    <div className="bg-card rounded-lg p-4">
-                      <p className="text-sm font-medium">Current Location:</p>
-                      <p className="text-sm text-muted-foreground">{currentTowing.towedTo}</p>
-                      <p className="text-sm text-muted-foreground">Gate No. 3, Parking Bay A-12</p>
-                    </div>
-                  </div>
-                  
-                  <Button className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300">
-                    <Search className="w-4 h-4 mr-2" />
-                    Get Directions to Depot
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="payment" className="space-y-4">
+              {/* PayPal Payment */}
+              {currentTowing ? (
+                <PayPalPayment
+                  amount={currentTowing.fine}
+                  vehicleNumber={vehicleInfo?.number || ''}
+                  towingId={towingRecords[0]?._id || ''}
+                  onPaymentSuccess={(paymentId) => {
+                    console.log('Payment successful:', paymentId);
+                    // Here you would update the payment status in your backend
+                    toast({
+                      title: 'Payment Successful!',
+                      description: 'Your fine has been paid. Vehicle will be released soon.',
+                    });
+                  }}
+                  onPaymentError={(error) => {
+                    console.error('Payment error:', error);
+                  }}
+                />
+              ) : (
+                <Card className="shadow-card">
+                  <CardContent className="p-8 text-center">
+                    <CreditCard className="w-16 h-16 mx-auto text-success mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No Outstanding Fines</h3>
+                    <p className="text-muted-foreground">
+                      Your vehicle has no pending fines to pay.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="history" className="space-y-4">
@@ -220,7 +340,5 @@ const UserDashboard = () => {
     </div>
   );
 };
-
-import { AlertTriangle } from "lucide-react";
 
 export default UserDashboard;

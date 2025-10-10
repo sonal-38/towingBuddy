@@ -10,41 +10,79 @@ import AppHeader from "@/components/AppHeader";
 import AppFooter from "@/components/AppFooter";
 
 const UserLogin = () => {
-  const [phone, setPhone] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const API_BASE = import.meta.env.VITE_API_URL || '';
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate OTP sending
-    setTimeout(() => {
-      setIsLoading(false);
-      setOtpSent(true);
-      toast({
-        title: "OTP Sent",
-        description: `Verification code sent to ${phone}`,
+
+    try {
+      // First lookup owner to get phone
+      const lookup = await fetch(`${API_BASE}/api/owners/lookup?vehicleNumber=${encodeURIComponent(vehicleNumber)}`);
+      const lookupData = await lookup.json();
+      if (!lookup.ok) throw new Error(lookupData.error || 'Owner not found');
+
+      const ownerPhone: string = lookupData.owner?.phone;
+      if (!ownerPhone) throw new Error('Owner phone not available');
+
+      // Mask phone for UI: keep last 4 digits
+      const last4 = ownerPhone.slice(-4);
+      const masked = ownerPhone.length > 4 ? `+${ownerPhone.replace(/[^0-9]/g, '').slice(0, -4).replace(/./g, 'X')}${last4}` : ownerPhone;
+
+      // Request OTP (backend will still lookup owner but this provides immediate feedback)
+      const res = await fetch(`${API_BASE}/api/auth/request-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleNumber }),
       });
-    }, 1000);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to request OTP');
+
+      setOtpSent(true);
+      toast({ title: 'OTP Sent', description: `Verification code sent to ${masked}` });
+    } catch (err) {
+      console.error('request-otp error', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: 'Error', description: msg || 'Could not send OTP', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate OTP verification
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Login Successful",
-        description: "Welcome to TowingBuddy",
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vehicleNumber, otp }),
       });
-      navigate("/user/dashboard");
-    }, 1000);
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'OTP verification failed');
+
+      toast({ title: 'Login Successful', description: 'Welcome to TowingBuddy' });
+
+      // Optionally store vehicles in sessionStorage for dashboard
+      if (data.vehicles) sessionStorage.setItem('towing_vehicles', JSON.stringify(data.vehicles));
+
+      navigate('/user/dashboard');
+    } catch (err) {
+      console.error('verify-otp error', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: 'Error', description: msg || 'OTP verification failed', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -70,15 +108,15 @@ const UserLogin = () => {
           {!otpSent ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+                <Label htmlFor="vehicleNumber" className="text-sm font-medium">Vehicle Number</Label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Car className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+91 9876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    id="vehicleNumber"
+                    type="text"
+                    placeholder="MH12AB1234"
+                    value={vehicleNumber}
+                    onChange={(e) => setVehicleNumber(e.target.value)}
                     className="pl-10 h-12"
                     required
                   />

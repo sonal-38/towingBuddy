@@ -27,78 +27,98 @@ const AddVehicle = () => {
     reason: "",
   });
 
-  // Simulate database lookup for vehicle owner details
-  const getVehicleData = (vehicleNumber: string) => {
-    const mockDatabase = {
-      "MH12AB1234": {
-        name: "Rajesh Kumar",
-        phone: "+91 9876543210",
-        model: "Maruti Swift VDI",
-      },
-      "DL01BC5678": {
-        name: "Priya Sharma", 
-        phone: "+91 9123456789",
-        model: "Hyundai i20 Sportz",
-      },
-      "KA03CD9012": {
-        name: "Amit Patel",
-        phone: "+91 8765432109", 
-        model: "Honda City ZX",
-      },
-      "TN09EF3456": {
-        name: "Lakshmi Reddy",
-        phone: "+91 7890123456",
-        model: "Toyota Innova Crysta",
-      }
-    };
+  const lookupOwner = async (rawVehicleNumber: string) => {
+    const env = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
+    const apiBase = env?.VITE_API_URL || 'http://localhost:5000';
+    const clean = rawVehicleNumber.replace(/\s+/g, '').toUpperCase();
+    if (!clean) return null;
 
-    // Remove spaces and convert to uppercase for lookup
-    const cleanNumber = vehicleNumber.replace(/\s+/g, '').toUpperCase();
-    
-    // Return data if found, otherwise return default
-    return mockDatabase[cleanNumber] || {
-      name: "Vehicle Owner",
-      phone: "+91 9000000000", 
-      model: "Unknown Model",
-    };
+    try {
+      const res = await fetch(`${apiBase}/api/owners/lookup?vehicleNumber=${encodeURIComponent(clean)}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.owner || null;
+    } catch (err) {
+      console.error('Owner lookup failed', err);
+      return null;
+    }
   };
 
   const handleVehicleNumberChange = (value: string) => {
     setVehicleNumber(value);
-    
     // Clear previous data when vehicle number changes
-    if (value.length < 8) {
-      setOwnerDetails({
-        name: "",
-        phone: "",
-        model: "",
-      });
-      return;
+    if (value.replace(/\s+/g, '').length < 6) {
+      setOwnerDetails({ name: '', phone: '', model: '' });
     }
-    
-    // Simulate auto-fetch owner details with realistic data based on vehicle number
-    if (value.length >= 8) {
-      setTimeout(() => {
-        // Simulate different responses based on vehicle number
-        const vehicleData = getVehicleData(value);
-        setOwnerDetails(vehicleData);
-      }, 800);
+  };
+
+  const handleVehicleNumberLookup = async () => {
+    if (!vehicleNumber || vehicleNumber.replace(/\s+/g, '').length < 6) return;
+    const owner = await lookupOwner(vehicleNumber);
+    if (owner) {
+      setOwnerDetails({ name: owner.ownerName || owner.name || '', phone: owner.phone || '', model: owner.model || '' });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate submission and SMS sending
-    setTimeout(() => {
+
+    try {
+      // Read Vite env safely
+      const env = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
+      const apiBase = env?.VITE_API_URL || 'http://localhost:5000';
+
+      // prepare payload matching backend expected fields; include owner info if available
+      type VehiclePayload = {
+        vehicleNumber: string;
+        towedFrom: string;
+        towedTo: string;
+        fine: number;
+        reason: string;
+        owner?: { name?: string; phone?: string; model?: string };
+      };
+
+      const payload: VehiclePayload = {
+        vehicleNumber: vehicleNumber,
+        towedFrom: towingInfo.towedFrom,
+        towedTo: towingInfo.towedTo,
+        fine: Number(towingInfo.fine) || 0,
+        reason: towingInfo.reason,
+      };
+      if (ownerDetails.name) {
+        payload.owner = {
+          name: ownerDetails.name,
+          phone: ownerDetails.phone,
+          model: ownerDetails.model,
+        };
+      }
+
+      const res = await fetch(`${apiBase}/api/vehicles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || 'Failed to add vehicle');
+
       setIsLoading(false);
       toast({
-        title: "Towing Record Added",
-        description: `SMS notification sent to ${ownerDetails.phone}`,
+        title: 'Towing Record Added',
+        description: `Record added for ${vehicleNumber}`,
       });
-      navigate("/admin/dashboard");
-    }, 2000);
+      navigate('/admin/dashboard');
+    } catch (err) {
+      console.error(err);
+      setIsLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      toast({
+        title: 'Error',
+        description: message || 'Could not add towing record',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -145,6 +165,13 @@ const AddVehicle = () => {
                     placeholder="e.g., MH 12 AB 1234"
                     value={vehicleNumber}
                     onChange={(e) => handleVehicleNumberChange(e.target.value)}
+                    onBlur={() => handleVehicleNumberLookup()}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        await handleVehicleNumberLookup();
+                      }
+                    }}
                     className="h-12 text-lg"
                     required
                   />
@@ -193,18 +220,14 @@ const AddVehicle = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="towedTo">Towed To *</Label>
-                    <Select onValueChange={(value) => setTowingInfo(prev => ({ ...prev, towedTo: value }))}>
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="Select depot location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="city-central">City Central Depot</SelectItem>
-                        <SelectItem value="north-depot">North Depot</SelectItem>
-                        <SelectItem value="south-depot">South Depot</SelectItem>
-                        <SelectItem value="east-depot">East Depot</SelectItem>
-                        <SelectItem value="west-depot">West Depot</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="towedTo"
+                      placeholder="e.g., City Central Depot, Gate No. 3"
+                      value={towingInfo.towedTo}
+                      onChange={(e) => setTowingInfo(prev => ({ ...prev, towedTo: e.target.value }))}
+                      className="h-12"
+                      required
+                    />
                   </div>
                 </div>
 

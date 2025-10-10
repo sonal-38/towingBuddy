@@ -1,3 +1,49 @@
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-18px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2.5s infinite;
+}
+/* Home page enhancements */
+.homepage-gradient {
+  background: linear-gradient(120deg, #f0f4ff 0%, #e0e7ff 50%, #f5faff 100%);
+  min-height: 100vh;
+}
+
+.homepage-hero {
+  animation: fadeInDown 1s ease;
+}
+
+.homepage-card {
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  border-radius: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.homepage-card:hover {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 16px 40px 0 rgba(31, 38, 135, 0.18);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+body {
+  background: none;
+  /* ...other styles... */
+}
 #root {
   max-width: 1280px;
   margin: 0 auto;
