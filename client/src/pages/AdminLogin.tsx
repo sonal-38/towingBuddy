@@ -19,16 +19,46 @@ const AdminLogin = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login - replace with actual authentication
-    setTimeout(() => {
-      setIsLoading(false);
-      toast({
-        title: "Login Successful",
-        description: "Welcome to TowingBuddy Admin Panel",
+    try {
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
-      navigate("/admin/dashboard");
-    }, 1000);
+
+      // Be defensive: servers sometimes return empty or non-JSON bodies on errors.
+      const text = await res.text();
+      let data: unknown = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        // not JSON — surface raw text as error message
+        data = { error: text || res.statusText };
+      }
+
+      // safely extract `error` property if present
+      const maybeError = ((): string | undefined => {
+        if (typeof data === 'object' && data !== null && 'error' in data) {
+          const d = data as { error?: unknown };
+          if (typeof d.error === 'string') return d.error;
+        }
+        return undefined;
+      })();
+
+      if (!res.ok) {
+        toast({ title: 'Login failed', description: maybeError || 'Invalid credentials', variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Login Successful', description: 'Welcome to TowingBuddy Admin Panel' });
+      // TODO: store token/session if you add JWTs later
+      navigate('/admin/dashboard');
+    } catch (err) {
+      console.error('admin login error', err);
+      toast({ title: 'Login error', description: 'Unable to reach server', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

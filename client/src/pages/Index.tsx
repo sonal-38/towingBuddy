@@ -3,7 +3,7 @@ import { User, Shield as ShieldIcon, ChevronDown, Shield, Car, Users, BarChart3,
 const HomeHeader = () => {
   const navigate = useNavigate();
   return (
-    <header className="w-full px-8 py-3 flex items-center justify-between bg-white shadow-sm">
+    <header className="w-full px-8 py-3 flex items-center justify-between bg-white shadow-sm relative z-20">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow">
           <Car className="w-6 h-6 text-white" />

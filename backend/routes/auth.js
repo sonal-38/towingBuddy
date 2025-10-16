@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const Owner = require('../models/Owner');
 const Otp = require('../models/Otp');
+const Admin = require('../models/Admin');
 const { sendTowingSMS } = require('../lib/sms');
 
 const router = express.Router();
@@ -97,4 +98,26 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+// POST /api/auth/admin-login
+// body: { email, password }
+router.post('/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+
+    const admin = await Admin.findOne({ email: String(email).toLowerCase().trim() });
+    if (!admin) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const ok = await admin.verifyPassword(password);
+    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+
+    // For now return a simple success indicator. You can extend to issue JWTs if needed.
+    return res.json({ ok: true, email: admin.email, role: admin.role });
+  } catch (err) {
+    console.error('admin-login error', err);
+    return res.status(500).json({ error: 'internal' });
+  }
+});
+
 module.exports = router;
+

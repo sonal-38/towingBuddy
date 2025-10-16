@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import UserHeader from "@/components/UserHeader";
-import TowingLocationMap from "@/components/TowingLocationMap";
 import PayPalPayment from "@/components/PayPalPayment";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import TowingLocationMap from "@/components/TowingLocationMap";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Car, MapPin, CreditCard, Clock, History, Search, Navigation, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface TowingRecord {
   _id: string;
@@ -39,6 +40,7 @@ const UserDashboard = () => {
   const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -147,10 +149,15 @@ const UserDashboard = () => {
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header Section */}
           <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground">My Vehicle</h2>
-              <p className="text-muted-foreground">Track your vehicle status and manage fines</p>
-            </div>
+              <div>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-3xl font-bold text-foreground">My Vehicle</h2>
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="text-muted-foreground hover:text-foreground">
+                    Home
+                  </Button>
+                </div>
+                <p className="text-muted-foreground">Track your vehicle status and manage fines</p>
+              </div>
           </div>
 
           {/* Vehicle Info Card */}
@@ -245,13 +252,29 @@ const UserDashboard = () => {
             </TabsContent>
 
             <TabsContent value="location" className="space-y-4">
-              {/* Vehicle Location Map */}
+              {/* Vehicle Location (renders Leaflet map) */}
               {currentTowing ? (
-                <TowingLocationMap 
-                  towedTo={currentTowing.towedTo}
-                  towedFrom={currentTowing.towedFrom}
-                  vehicleNumber={vehicleInfo?.number}
-                />
+                <Card className="shadow-card">
+                  <CardHeader>
+                    <CardTitle>Location Details</CardTitle>
+                    <CardDescription>Approximate positions on the map</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <TowingLocationMap from={currentTowing.towedFrom} to={currentTowing.towedTo} height="360px" />
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Towed From</label>
+                          <p className="text-sm">{currentTowing.towedFrom}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Towed To</label>
+                          <p className="text-sm">{currentTowing.towedTo}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ) : (
                 <Card className="shadow-card">
                   <CardContent className="p-8 text-center">

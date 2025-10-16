@@ -1,199 +1,125 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { MapPin, Navigation, ExternalLink } from 'lucide-react';
 
-interface TowingLocationMapProps {
-  towedTo: string;
-  towedFrom?: string;
-  vehicleNumber?: string;
+// Fix default icon paths for bundlers (Vite)
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+(L.Icon.Default as any).mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+type LatLng = { lat: number; lon: number };
+
+async function geocodeAddress(address: string): Promise<LatLng | null> {
+  if (!address) return null;
+  try {
+    const cacheKey = 'geocodeCache_v1';
+    const raw = sessionStorage.getItem(cacheKey);
+    const cache = raw ? JSON.parse(raw) as Record<string, LatLng> : {};
+    if (cache[address]) return cache[address];
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const first = data[0];
+    const entry = { lat: parseFloat(first.lat), lon: parseFloat(first.lon) };
+    cache[address] = entry;
+    // keep cache small
+    const keys = Object.keys(cache);
+    if (keys.length > 200) {
+      // drop oldest (not tracking order) - simple strategy: keep most recent 180
+      const sliced = keys.slice(-180);
+      const newCache: Record<string, LatLng> = {};
+      for (const k of sliced) newCache[k] = cache[k];
+      sessionStorage.setItem(cacheKey, JSON.stringify(newCache));
+    } else {
+      sessionStorage.setItem(cacheKey, JSON.stringify(cache));
+    }
+    return entry;
+  } catch (err) {
+    console.error('Geocode error', err);
+    return null;
+  }
 }
 
-// Fix for default markers in Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Custom red marker for towing location
-const redIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-// Component to update map center when coordinates change
-const MapUpdater: React.FC<{ coordinates: [number, number] }> = ({ coordinates }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    map.setView(coordinates, 15);
-  }, [coordinates, map]);
-  
-  return null;
-};
-
-const TowingLocationMap: React.FC<TowingLocationMapProps> = ({ 
-  towedTo, 
-  towedFrom, 
-  vehicleNumber 
-}) => {
-  const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
+export default function TowingLocationMap({ from, to, height = '360px' }: { from: string; to: string; height?: string }) {
+  const [fromCoord, setFromCoord] = useState<LatLng | null>(null);
+  const [toCoord, setToCoord] = useState<LatLng | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Default coordinates (Mumbai, India)
-  const defaultCoords: [number, number] = [19.0760, 72.8777];
-
   useEffect(() => {
-    geocodeLocation(towedTo);
-  }, [towedTo]);
+    let mounted = true;
+    setLoading(true);
+    setError(null);
 
-  const geocodeLocation = async (address: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Use Nominatim (OpenStreetMap's free geocoding service)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=in&limit=1`
-      );
-
-      if (!response.ok) {
-        throw new Error('Geocoding failed');
+    (async () => {
+      try {
+        const [f, t] = await Promise.all([geocodeAddress(from), geocodeAddress(to)]);
+        if (!mounted) return;
+        setFromCoord(f);
+        setToCoord(t);
+        if (!f && !t) setError('Could not geocode addresses');
+      } catch (err) {
+        console.error(err);
+        if (mounted) setError('Failed to load map data');
+      } finally {
+        if (mounted) setLoading(false);
       }
+    })();
 
-      const data = await response.json();
+    return () => { mounted = false; };
+  }, [from, to]);
 
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lng = parseFloat(data[0].lon);
-        const coords: [number, number] = [lat, lng];
-        
-        setCoordinates(coords);
-      } else {
-        // Fallback to default coordinates if geocoding fails
-        setCoordinates(defaultCoords);
-        setError('Exact location not found, showing approximate area');
-      }
-    } catch (err) {
-      console.error('Geocoding error:', err);
-      setCoordinates(defaultCoords);
-      setError('Unable to locate the address, showing approximate area');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center p-6">
+        <div className="text-sm text-muted-foreground">Loading map…</div>
+      </div>
+    );
+  }
 
-  const openInMaps = () => {
-    if (coordinates) {
-      const [lat, lng] = coordinates;
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-      window.open(url, '_blank');
-    }
-  };
+  if (error) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">{error}. Showing textual addresses instead.</div>
+    );
+  }
 
-  const openInOpenStreetMap = () => {
-    if (coordinates) {
-      const [lat, lng] = coordinates;
-      const url = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=15`;
-      window.open(url, '_blank');
-    }
-  };
+  // Determine bounds and center
+  const markers: Array<{ pos: [number, number]; label: string }> = [];
+  if (fromCoord) markers.push({ pos: [fromCoord.lat, fromCoord.lon], label: 'Towed From' });
+  if (toCoord) markers.push({ pos: [toCoord.lat, toCoord.lon], label: 'Towed To' });
+
+  if (markers.length === 0) {
+    return <div className="p-4 text-sm text-muted-foreground">No location coordinates available.</div>;
+  }
+
+  const bounds = markers.map(m => m.pos as [number, number]) as [number, number][];
+
+  // Center on first marker if only one
+  const center: [number, number] = markers.length === 1 ? markers[0].pos : [(markers[0].pos[0] + markers[1].pos[0]) / 2, (markers[0].pos[1] + markers[1].pos[1]) / 2];
 
   return (
-    <Card className="shadow-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-primary" />
-          Vehicle Location Map
-        </CardTitle>
-        <CardDescription>
-          {towedFrom && `Towed from: ${towedFrom}`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {loading && (
-          <div className="flex items-center justify-center h-64 bg-muted/50 rounded-lg">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm text-muted-foreground">Loading map...</p>
-            </div>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-yellow-800">⚠️ {error}</p>
-          </div>
-        )}
-
-        {!loading && coordinates && (
-          <>
-            <div className="w-full h-64 rounded-lg border overflow-hidden">
-              <MapContainer
-                center={coordinates}
-                zoom={15}
-                style={{ height: '100%', width: '100%' }}
-                scrollWheelZoom={true}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={coordinates} icon={redIcon}>
-                  <Popup>
-                    <div className="p-2">
-                      <h3 className="font-semibold text-sm">Vehicle Location</h3>
-                      <p className="text-xs text-gray-600">{vehicleNumber || 'Vehicle'}</p>
-                      <p className="text-xs mt-1">{towedTo}</p>
-                    </div>
-                  </Popup>
-                </Marker>
-                <MapUpdater coordinates={coordinates} />
-              </MapContainer>
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                onClick={openInMaps}
-                variant="outline" 
-                size="sm"
-                className="flex-1"
-              >
-                <Navigation className="w-4 h-4 mr-2" />
-                Get Directions
-              </Button>
-              <Button 
-                onClick={openInOpenStreetMap}
-                variant="outline" 
-                size="sm"
-                className="flex-1"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Open in OSM
-              </Button>
-            </div>
-          </>
-        )}
-
-        <div className="text-xs text-muted-foreground">
-          <p>📍 <strong>Current Location:</strong> {towedTo}</p>
-          {coordinates && (
-            <p>🗺️ <strong>Coordinates:</strong> {coordinates[0].toFixed(6)}, {coordinates[1].toFixed(6)}</p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <div style={{ height }} className="w-full rounded-md overflow-hidden">
+      <MapContainer center={center} bounds={bounds} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {markers.map((m, i) => (
+          <Marker key={i} position={m.pos}>
+            <Popup>{m.label}</Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
   );
-};
-
-export default TowingLocationMap;
+}

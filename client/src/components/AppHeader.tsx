@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Car, ArrowLeft } from "lucide-react";
+import { Home } from "lucide-react";
 
 interface AppHeaderProps {
   showBackButton?: boolean;
@@ -14,7 +15,7 @@ const AppHeader = ({ showBackButton = false, backTo = "/", title, subtitle }: Ap
   const location = useLocation();
 
   return (
-    <header className="bg-card border-b border-border shadow-card">
+    <header className="bg-card border-b border-border shadow-card relative z-20">
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-4">
           {showBackButton && (
@@ -44,6 +45,14 @@ const AppHeader = ({ showBackButton = false, backTo = "/", title, subtitle }: Ap
             {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+            <Link to="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   );

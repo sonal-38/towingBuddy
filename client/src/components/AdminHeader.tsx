@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { Shield, LogOut, Bell, Settings } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Shield, LogOut, Bell, Settings, Home } from "lucide-react";
 
 const AdminHeader = () => {
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ const AdminHeader = () => {
   };
 
   return (
-    <header className="bg-card border-b border-border shadow-card">
+    <header className="bg-card border-b border-border shadow-card relative z-20">
       <div className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
@@ -23,6 +23,12 @@ const AdminHeader = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+            <Link to="/" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Link>
+          </Button>
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
             <Bell className="w-4 h-4" />
           </Button>
