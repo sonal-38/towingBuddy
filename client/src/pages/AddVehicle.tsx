@@ -27,6 +27,14 @@ const AddVehicle = () => {
     reason: "",
   });
 
+  // Optional coordinate inputs (admin can provide lat/lon to avoid runtime geocoding)
+  const [towingCoords, setTowingCoords] = useState({
+    towedFromLat: '',
+    towedFromLon: '',
+    towedToLat: '',
+    towedToLon: '',
+  });
+
   const lookupOwner = async (rawVehicleNumber: string) => {
     const env = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env;
     const apiBase = env?.VITE_API_URL || 'http://localhost:5000';
@@ -79,7 +87,9 @@ const AddVehicle = () => {
         owner?: { name?: string; phone?: string; model?: string };
       };
 
-      const payload: VehiclePayload = {
+      type Coord = { lat: number; lon: number };
+
+      const payload: VehiclePayload & Partial<{ towedFromCoords: Coord; towedToCoords: Coord }> = {
         vehicleNumber: vehicleNumber,
         towedFrom: towingInfo.towedFrom,
         towedTo: towingInfo.towedTo,
@@ -93,6 +103,13 @@ const AddVehicle = () => {
           model: ownerDetails.model,
         };
       }
+      // include coordinates if provided and parseable
+      const fromLat = towingCoords.towedFromLat ? Number(towingCoords.towedFromLat) : NaN;
+      const fromLon = towingCoords.towedFromLon ? Number(towingCoords.towedFromLon) : NaN;
+      const toLat = towingCoords.towedToLat ? Number(towingCoords.towedToLat) : NaN;
+      const toLon = towingCoords.towedToLon ? Number(towingCoords.towedToLon) : NaN;
+  if (!Number.isNaN(fromLat) && !Number.isNaN(fromLon)) (payload as unknown as Record<string, unknown>)['towedFromCoords'] = { lat: fromLat, lon: fromLon };
+  if (!Number.isNaN(toLat) && !Number.isNaN(toLon)) (payload as unknown as Record<string, unknown>)['towedToCoords'] = { lat: toLat, lon: toLon };
 
       const res = await fetch(`${apiBase}/api/vehicles`, {
         method: 'POST',
@@ -217,6 +234,20 @@ const AddVehicle = () => {
                       className="h-12"
                       required
                     />
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <Input
+                        placeholder="lat"
+                        value={towingCoords.towedFromLat}
+                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedFromLat: e.target.value }))}
+                        className="h-9"
+                      />
+                      <Input
+                        placeholder="lon"
+                        value={towingCoords.towedFromLon}
+                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedFromLon: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="towedTo">Towed To *</Label>
@@ -228,6 +259,20 @@ const AddVehicle = () => {
                       className="h-12"
                       required
                     />
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                      <Input
+                        placeholder="lat"
+                        value={towingCoords.towedToLat}
+                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedToLat: e.target.value }))}
+                        className="h-9"
+                      />
+                      <Input
+                        placeholder="lon"
+                        value={towingCoords.towedToLon}
+                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedToLon: e.target.value }))}
+                        className="h-9"
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -39,4 +39,4 @@ You can seed a couple of sample owner records for testing. Make sure your `.env`
 
 - node scripts/seedOwners.js
 
-This will upsert two sample owners (`MH12AB1234`, `KA05MN9876`) so you can test the auto-fill feature from the frontend.
+This will upsert two sample owners (`MHAB1234`, `KA05MN9876`) so you can test the auto-fill feature from the frontend.

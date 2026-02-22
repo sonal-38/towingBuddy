@@ -7,7 +7,7 @@ const Owner = require('../models/Owner');
 router.post('/', async (req, res) => {
   try {
     // Accept either `plateNumber` or `vehicleNumber` from frontend
-    const { plateNumber: plateA, vehicleNumber: plateB, towedFrom, towedTo, fine, reason } = req.body;
+    const { plateNumber: plateA, vehicleNumber: plateB, towedFrom, towedTo, fine, reason, towedFromCoords, towedToCoords } = req.body;
     const rawPlate = plateA || plateB;
 
     // Validate required fields
@@ -19,6 +19,18 @@ router.post('/', async (req, res) => {
 
     // Create a new towing record (allow multiple tows for same plate)
     const vehicleData = { plateNumber: normalized, towedFrom, towedTo, fine: Number(fine) || 0, reason };
+
+    // attach coordinates if provided (validate numbers)
+    if (towedFromCoords && typeof towedFromCoords === 'object') {
+      const lat = Number(towedFromCoords.lat);
+      const lon = Number(towedFromCoords.lon);
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) vehicleData.towedFromCoords = { lat, lon };
+    }
+    if (towedToCoords && typeof towedToCoords === 'object') {
+      const lat = Number(towedToCoords.lat);
+      const lon = Number(towedToCoords.lon);
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) vehicleData.towedToCoords = { lat, lon };
+    }
 
     // If owner provided in payload, use it. Otherwise, try to lookup in Owners collection
     if (req.body.owner && req.body.owner.name) {
