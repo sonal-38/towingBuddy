@@ -97,6 +97,34 @@ function useFitBounds(coords: Array<[number, number]>) {
   return null;
 }
 
+// Function to request user's current location
+async function requestUserLocation(): Promise<[number, number] | null> {
+  return new Promise((resolve) => {
+    if (!('geolocation' in navigator)) {
+      console.error('Geolocation not supported');
+      resolve(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        console.log('Got user location:', latitude, longitude);
+        resolve([latitude, longitude]);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        resolve(null);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000, // 10 seconds
+        maximumAge: 0, // Don't use cached position
+      }
+    );
+  });
+}
+
 export default function TowingLocationMap({ from, to, height = '360px', fromCoords, toCoords }: { from: string; to: string; height?: string; fromCoords?: LatLng | null; toCoords?: LatLng | null }) {
   const [fromCoord, setFromCoord] = useState<LatLng | null>(fromCoords || null);
   const [toCoord, setToCoord] = useState<LatLng | null>(toCoords || null);
@@ -107,6 +135,8 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
   const [routeSummary, setRouteSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [isRouting, setIsRouting] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -136,17 +166,58 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
     return () => { mounted = false; };
   }, [from, to, fromCoords, toCoords]);
 
-  // track user position in real-time
+  // Request user location on component mount (ask for permission)
   useEffect(() => {
+    let mounted = true;
     let watcher: number | null = null;
-    if ('geolocation' in navigator) {
+
+    const setupGeolocation = async () => {
+      if (!('geolocation' in navigator)) {
+        if (mounted) setLocationError('Geolocation not supported in your browser');
+        return;
+      }
+
+      try {
+        // Try to get current position first
+        const pos = await requestUserLocation();
+        if (mounted && pos) {
+          setUserPos(pos);
+          setLocationError(null);
+        }
+      } catch (err) {
+        console.error('Error getting location:', err);
+      }
+
+      // Then setup watcher for real-time updates
       watcher = navigator.geolocation.watchPosition(
-        (p) => setUserPos([p.coords.latitude, p.coords.longitude]),
-        (e) => console.warn('geo error', e),
+        (p) => {
+          if (mounted) {
+            setUserPos([p.coords.latitude, p.coords.longitude]);
+            setLocationError(null);
+          }
+        },
+        (e) => {
+          if (mounted) {
+            console.warn('Geolocation watch error:', e);
+            if (e.code === 1) {
+              setLocationError('Location permission denied. Enable in browser settings.');
+            } else if (e.code === 2) {
+              setLocationError('Unable to get your location. Try again.');
+            } else {
+              setLocationError('Geolocation error. Check browser permissions.');
+            }
+          }
+        },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
       );
-    }
-    return () => { if (watcher !== null) navigator.geolocation.clearWatch(watcher); };
+    };
+
+    setupGeolocation();
+
+    return () => {
+      mounted = false;
+      if (watcher !== null) navigator.geolocation.clearWatch(watcher);
+    };
   }, []);
 
   // fetch route from OSRM using coordinates (driving)
@@ -268,11 +339,58 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
       </div>
 
       {/* Controls and summary below the map */}
-      <div className="p-3 flex items-start gap-4">
-        <div>
+      <div className="p-3 space-y-3">
+        {/* Location Status */}
+        {locationError && (
+          <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-sm text-amber-800">{locationError}</p>
+          </div>
+        )}
+
+        {userPos && (
+          <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md">
+            <p className="text-sm text-green-800">
+              <strong>Your Location:</strong> {userPos[0].toFixed(4)}°, {userPos[1].toFixed(4)}°
+            </p>
+          </div>
+        )}
+
+        {/* Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            title="Get your current location"
+            className="px-3 py-2 rounded bg-green-600 text-white shadow hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+            disabled={isGettingLocation}
+            onClick={async () => {
+              setIsGettingLocation(true);
+              setLocationError(null);
+              try {
+                const pos = await requestUserLocation();
+                if (pos) {
+                  setUserPos(pos);
+                  setLocationError(null);
+                } else {
+                  setLocationError('Could not get your location. Check permissions.');
+                }
+              } catch (err) {
+                console.error('Error:', err);
+                setLocationError('Failed to get location. Try again.');
+              } finally {
+                setIsGettingLocation(false);
+              }
+            }}
+          >
+            {isGettingLocation ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span>📍</span>
+            )}
+            <span>{isGettingLocation ? 'Getting Location...' : 'My Location'}</span>
+          </button>
+
           <button
             title="Get directions from my live location"
-            className="px-3 py-2 rounded bg-blue-600 text-white shadow hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-3 py-2 rounded bg-blue-600 text-white shadow hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm"
             disabled={!userPos || !toCoord || isRouting}
             onClick={async () => {
               setRouteError(null);
@@ -324,7 +442,7 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
             }}
           >
             {isRouting ? <span className="loader w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
-            <span>Directions from me</span>
+            <span>🛣️ Directions</span>
           </button>
         </div>
 
