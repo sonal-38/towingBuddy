@@ -271,6 +271,7 @@ const UserDashboard = () => {
                         height="420px"
                         fromCoords={towingRecords[0]?.towedFromCoords || null}
                         toCoords={towingRecords[0]?.towedToCoords || null}
+                        createdAt={towingRecords[0]?.createdAt || new Date().toISOString()}
                       />
                       <div className="space-y-2">
                         <div>
