@@ -125,7 +125,7 @@ async function requestUserLocation(): Promise<[number, number] | null> {
   });
 }
 
-export default function TowingLocationMap({ from, to, height = '360px', fromCoords, toCoords }: { from: string; to: string; height?: string; fromCoords?: LatLng | null; toCoords?: LatLng | null }) {
+export default function TowingLocationMap({ from, to, height = '360px', fromCoords, toCoords, createdAt }: { from: string; to: string; height?: string; fromCoords?: LatLng | null; toCoords?: LatLng | null; createdAt?: string }) {
   const [fromCoord, setFromCoord] = useState<LatLng | null>(fromCoords || null);
   const [toCoord, setToCoord] = useState<LatLng | null>(toCoords || null);
   const [userPos, setUserPos] = useState<[number, number] | null>(null);
@@ -137,6 +137,14 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
   const [routeError, setRouteError] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  
+  // Time-based location reveal
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showFromLocation, setShowFromLocation] = useState(true);
+  const [showToLocation, setShowToLocation] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState(0);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -166,7 +174,49 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
     return () => { mounted = false; };
   }, [from, to, fromCoords, toCoords]);
 
-  // Request user location on component mount (ask for permission)
+  // Time-based location reveal timer
+  useEffect(() => {
+    if (!createdAt) return;
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const createdTime = new Date(createdAt).getTime();
+      const elapsed = Math.floor((now - createdTime) / 1000); // elapsed seconds
+      
+      setElapsedSeconds(elapsed);
+
+      // Calculate minutes and seconds for display
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      setTimerMinutes(mins);
+      setTimerSeconds(secs);
+
+      // Time-based logic
+      const SHOW_FROM_UNTIL = 10 * 60; // 10 minutes in seconds
+      const SHOW_TO_AFTER = 15 * 60; // 15 minutes in seconds
+
+      // Show "From" location for first 10 minutes
+      if (elapsed < SHOW_FROM_UNTIL) {
+        setShowFromLocation(true);
+        setShowToLocation(false);
+        setShowAlert(false);
+      }
+      // Show "To" location after 15 minutes
+      else if (elapsed >= SHOW_TO_AFTER) {
+        setShowFromLocation(false);
+        setShowToLocation(true);
+        setShowAlert(true);
+      }
+      // Between 10-15 minutes, show both
+      else {
+        setShowFromLocation(true);
+        setShowToLocation(true);
+        setShowAlert(false);
+      }
+    }, 1000); // Update every second
+
+    return () => clearInterval(timer);
+  }, [createdAt]);
   useEffect(() => {
     let mounted = true;
     let watcher: number | null = null;
@@ -271,8 +321,10 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
   if (loading) return <div className="p-4 text-sm text-muted-foreground">Loading map...</div>;
   if (error) return <div className="p-4 text-sm text-muted-foreground">{error}</div>;
   const markers: Array<{ pos: [number, number]; label: string; color?: string }> = [];
-  if (fromCoord) markers.push({ pos: [fromCoord.lat, fromCoord.lon], label: 'Towed From' });
-  if (toCoord) markers.push({ pos: [toCoord.lat, toCoord.lon], label: 'Towed To', color: 'red' });
+  
+  // Conditional marker rendering based on time
+  if (showFromLocation && fromCoord) markers.push({ pos: [fromCoord.lat, fromCoord.lon], label: 'Towed From' });
+  if (showToLocation && toCoord) markers.push({ pos: [toCoord.lat, toCoord.lon], label: 'Towed To', color: 'red' });
   if (userPos) markers.push({ pos: userPos, label: 'You', color: 'blue' });
 
   const bounds = markers.map(m => m.pos) as [number, number][];
@@ -281,8 +333,30 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
   const routeColor = '#ff3b30';
 
   return (
-    <div className="w-full rounded-md overflow-hidden">
-      <div style={{ height }} className="w-full">
+    <div className="w-full rounded-md overflow-hidden relative">
+      <div style={{ height }} className="w-full relative">
+        {/* Timer Badge Overlay (positioned over map) */}
+        {createdAt && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              zIndex: 1000,
+              background: 'white',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '2px solid #3b82f6',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#1e40af',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            }}
+          >
+            ⏱️ {String(timerMinutes).padStart(2, '0')}:{String(timerSeconds).padStart(2, '0')}
+          </div>
+        )}
+        
         <MapContainer center={center} style={{ height: '100%', width: '100%' }}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
           {markers.map((m, i) => (
@@ -340,6 +414,51 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
 
       {/* Controls and summary below the map */}
       <div className="p-3 space-y-3">
+        {/* Timer Display (top right corner of map container) */}
+        {createdAt && (
+          <div className="flex items-center justify-between">
+            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm font-semibold text-blue-800">
+                ⏱️ Time Elapsed: {String(timerMinutes).padStart(2, '0')}:{String(timerSeconds).padStart(2, '0')}
+              </p>
+            </div>
+            
+            {/* Location Status Indicator */}
+            <div className="px-3 py-2 bg-purple-50 border border-purple-200 rounded-md">
+              {timerMinutes < 10 && (
+                <p className="text-sm font-semibold text-purple-800">📍 Showing: Towed From</p>
+              )}
+              {timerMinutes >= 10 && timerMinutes < 15 && (
+                <p className="text-sm font-semibold text-orange-800">📍 Transition: Both Locations</p>
+              )}
+              {timerMinutes >= 15 && (
+                <p className="text-sm font-semibold text-red-800">🚨 Showing: Towed To</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Alert Message - Shows after 15 minutes */}
+        {showAlert && (
+          <div className="px-4 py-3 bg-red-50 border-2 border-red-300 rounded-lg shadow-lg animate-pulse">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">⚠️</div>
+              <div>
+                <p className="text-sm font-bold text-red-800">IMPORTANT: Time's Up!</p>
+                <p className="text-sm text-red-700 mt-1">
+                  Your vehicle has been at the depot for {timerMinutes} minutes. If you don't come to retrieve it, you must go to:
+                </p>
+                <p className="text-sm font-semibold text-red-900 mt-2 p-2 bg-red-100 rounded">
+                  📍 {to}
+                </p>
+                <p className="text-xs text-red-600 mt-2">
+                  Contact the depot for information or vehicle release procedures.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Location Status */}
         {locationError && (
           <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
@@ -357,6 +476,12 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
 
         {/* Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Info message about time-based reveal */}
+          {createdAt && timerMinutes < 15 && (
+            <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700">
+              ℹ️ Towed To location will be revealed after 15 minutes. Current time: {timerMinutes}:{String(timerSeconds).padStart(2, '0')}
+            </div>
+          )}
           <button
             title="Get your current location"
             className="px-3 py-2 rounded bg-green-600 text-white shadow hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 text-sm"
@@ -391,8 +516,12 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
           <button
             title="Get directions from my live location"
             className="px-3 py-2 rounded bg-blue-600 text-white shadow hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm"
-            disabled={!userPos || !toCoord || isRouting}
+            disabled={!userPos || !toCoord || isRouting || !showToLocation}
             onClick={async () => {
+              if (!showToLocation) {
+                setLocationError(`Towed To location will be revealed after ${Math.max(0, 15 - timerMinutes)} minutes.`);
+                return;
+              }
               setRouteError(null);
               setRouteSummary(null);
               if (!userPos) return;
