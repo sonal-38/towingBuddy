@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppHeader from "@/components/AppHeader";
+import LocationSearchInput from "@/components/LocationSearchInput";
+import LocationPreviewMap from "@/components/LocationPreviewMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -220,61 +222,75 @@ const AddVehicle = () => {
                   <MapPin className="w-5 h-5 text-warning" />
                   Towing Information
                 </CardTitle>
-                <CardDescription>Fill in the towing details and violation information</CardDescription>
+                <CardDescription>Search locations using OpenStreetMap - coordinates are auto-filled</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="towedFrom">Towed From *</Label>
-                    <Input
-                      id="towedFrom"
-                      placeholder="e.g., Airport Road, Near Terminal 2"
+                    <LocationSearchInput
+                      label="Towed From"
                       value={towingInfo.towedFrom}
-                      onChange={(e) => setTowingInfo(prev => ({ ...prev, towedFrom: e.target.value }))}
-                      className="h-12"
-                      required
+                      onLocationSelect={(data) => {
+                        setTowingInfo(prev => ({ ...prev, towedFrom: data.address }));
+                        setTowingCoords(prev => ({
+                          ...prev,
+                          towedFromLat: data.lat.toString(),
+                          towedFromLon: data.lon.toString(),
+                        }));
+                      }}
+                      placeholder="Search for pickup location..."
+                      required={true}
+                      id="towedFrom"
                     />
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <Input
-                        placeholder="lat"
-                        value={towingCoords.towedFromLat}
-                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedFromLat: e.target.value }))}
-                        className="h-9"
-                      />
-                      <Input
-                        placeholder="lon"
-                        value={towingCoords.towedFromLon}
-                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedFromLon: e.target.value }))}
-                        className="h-9"
-                      />
-                    </div>
+                    {towingCoords.towedFromLat && towingCoords.towedFromLon && (
+                      <div className="mt-2 px-3 py-2 bg-success/10 border border-success/20 rounded-md">
+                        <p className="text-xs font-medium text-success flex items-center gap-2">
+                          <MapPin className="w-3 h-3" />
+                          Coordinates: {Number(towingCoords.towedFromLat).toFixed(6)}, {Number(towingCoords.towedFromLon).toFixed(6)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="towedTo">Towed To *</Label>
-                    <Input
-                      id="towedTo"
-                      placeholder="e.g., City Central Depot, Gate No. 3"
+                    <LocationSearchInput
+                      label="Towed To"
                       value={towingInfo.towedTo}
-                      onChange={(e) => setTowingInfo(prev => ({ ...prev, towedTo: e.target.value }))}
-                      className="h-12"
-                      required
+                      onLocationSelect={(data) => {
+                        setTowingInfo(prev => ({ ...prev, towedTo: data.address }));
+                        setTowingCoords(prev => ({
+                          ...prev,
+                          towedToLat: data.lat.toString(),
+                          towedToLon: data.lon.toString(),
+                        }));
+                      }}
+                      placeholder="Search for depot location..."
+                      required={true}
+                      id="towedTo"
                     />
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                      <Input
-                        placeholder="lat"
-                        value={towingCoords.towedToLat}
-                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedToLat: e.target.value }))}
-                        className="h-9"
-                      />
-                      <Input
-                        placeholder="lon"
-                        value={towingCoords.towedToLon}
-                        onChange={(e) => setTowingCoords(prev => ({ ...prev, towedToLon: e.target.value }))}
-                        className="h-9"
-                      />
-                    </div>
+                    {towingCoords.towedToLat && towingCoords.towedToLon && (
+                      <div className="mt-2 px-3 py-2 bg-success/10 border border-success/20 rounded-md">
+                        <p className="text-xs font-medium text-success flex items-center gap-2">
+                          <MapPin className="w-3 h-3" />
+                          Coordinates: {Number(towingCoords.towedToLat).toFixed(6)}, {Number(towingCoords.towedToLon).toFixed(6)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Map Preview */}
+                {(towingCoords.towedFromLat || towingCoords.towedToLat) && (
+                  <div className="pt-4">
+                    <LocationPreviewMap
+                      fromLat={towingCoords.towedFromLat ? parseFloat(towingCoords.towedFromLat) : undefined}
+                      fromLon={towingCoords.towedFromLon ? parseFloat(towingCoords.towedFromLon) : undefined}
+                      toLat={towingCoords.towedToLat ? parseFloat(towingCoords.towedToLat) : undefined}
+                      toLon={towingCoords.towedToLon ? parseFloat(towingCoords.towedToLon) : undefined}
+                      fromLabel="Towed From"
+                      toLabel="Towed To (Depot)"
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
