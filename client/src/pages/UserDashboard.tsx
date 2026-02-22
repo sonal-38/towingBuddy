@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import UserHeader from "@/components/UserHeader";
 import PayPalPayment from "@/components/PayPalPayment";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import TowingLocationMap from "@/components/TowingLocationMap";
+import TowingLocationMap from '@/components/TowingLocationMap';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Car, MapPin, CreditCard, Clock, History, Search, Navigation, AlertTriangle } from "lucide-react";
@@ -26,6 +26,9 @@ interface TowingRecord {
     phone: string;
     model: string;
   };
+  // optional coordinates saved by admin when creating the record
+  towedFromCoords?: { lat: number; lon: number };
+  towedToCoords?: { lat: number; lon: number };
 }
 
 interface VehicleInfo {
@@ -252,16 +255,23 @@ const UserDashboard = () => {
             </TabsContent>
 
             <TabsContent value="location" className="space-y-4">
-              {/* Vehicle Location (renders Leaflet map) */}
+              {/* Vehicle Location (render map with live tracking + directions) */}
               {currentTowing ? (
                 <Card className="shadow-card">
                   <CardHeader>
                     <CardTitle>Location Details</CardTitle>
-                    <CardDescription>Approximate positions on the map</CardDescription>
+                    <CardDescription>Map showing towing route and your live location</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <TowingLocationMap from={currentTowing.towedFrom} to={currentTowing.towedTo} height="360px" />
+                      {/* pass coordinates if available on the towing record to avoid client geocoding */}
+                      <TowingLocationMap
+                        from={currentTowing.towedFrom}
+                        to={currentTowing.towedTo}
+                        height="420px"
+                        fromCoords={towingRecords[0]?.towedFromCoords || null}
+                        toCoords={towingRecords[0]?.towedToCoords || null}
+                      />
                       <div className="space-y-2">
                         <div>
                           <label className="text-sm font-medium text-muted-foreground">Towed From</label>

@@ -13,6 +13,15 @@ const vehicleSchema = new mongoose.Schema(
     plateNumber: { type: String, required: true, trim: true, uppercase: true, index: true },
     towedFrom: { type: String, required: true, trim: true },
     towedTo: { type: String, required: true, trim: true },
+    // Optional coordinates provided at creation time to avoid client-side geocoding
+    towedFromCoords: {
+      lat: { type: Number },
+      lon: { type: Number },
+    },
+    towedToCoords: {
+      lat: { type: Number },
+      lon: { type: Number },
+    },
     fine: { type: Number, default: 0 },
     reason: { type: String, required: true, trim: true },
     owner: {
