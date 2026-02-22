@@ -260,11 +260,11 @@ const UserDashboard = () => {
                 <Card className="shadow-card">
                   <CardHeader>
                     <CardTitle>Location Details</CardTitle>
-                    <CardDescription>Map showing towing route and your live location</CardDescription>
+                    <CardDescription>Live location + towed-to depot shown on Google Maps and OpenStreetMap</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* Show depot location with Google Maps */}
+                      {/* Show towed-to depot location on OpenStreetMap */}
                       <TowingLocationMap
                         towedFromAddress={currentTowing.towedFrom}
                         towedToAddress={currentTowing.towedTo}
