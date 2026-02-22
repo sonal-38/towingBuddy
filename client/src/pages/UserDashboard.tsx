@@ -264,14 +264,13 @@ const UserDashboard = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {/* pass coordinates if available on the towing record to avoid client geocoding */}
+                      {/* Show depot location with Google Maps */}
                       <TowingLocationMap
-                        from={currentTowing.towedFrom}
-                        to={currentTowing.towedTo}
-                        height="420px"
-                        fromCoords={towingRecords[0]?.towedFromCoords || null}
-                        toCoords={towingRecords[0]?.towedToCoords || null}
-                        createdAt={towingRecords[0]?.createdAt || new Date().toISOString()}
+                        towedFromAddress={currentTowing.towedFrom}
+                        towedToAddress={currentTowing.towedTo}
+                        towedFromCoords={towingRecords[0]?.towedFromCoords || undefined}
+                        towedToCoords={towingRecords[0]?.towedToCoords || undefined}
+                        vehicleNumber={vehicleInfo?.number}
                       />
                       <div className="space-y-2">
                         <div>
