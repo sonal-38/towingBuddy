@@ -15,12 +15,13 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/admin-login', {
+      const res = await fetch(`${API_BASE}/api/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
