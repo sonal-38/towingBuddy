@@ -298,14 +298,29 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
   if (userPos) markers.push({ pos: userPos, label: 'You', color: 'blue' });
 
   const bounds = markers.map(m => m.pos) as [number, number][];
-  const center: [number, number] = markers.length > 0 ? markers[0].pos as [number, number] : [0, 0];
+  // Use India center as default instead of [0, 0]
+  const defaultCenter: [number, number] = [20.5937, 78.9629];
+  const center: [number, number] = markers.length > 0 ? (markers[0].pos as [number, number]) : defaultCenter;
 
   const routeColor = '#ff3b30';
+
+  // Only render map if we have valid coordinates
+  if (!toCoord && !userPos) {
+    return (
+      <div className="w-full rounded-md overflow-hidden bg-muted">
+        <div style={{ height }} className="w-full flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-muted-foreground">Loading map...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full rounded-md overflow-hidden">
       <div style={{ height }} className="w-full">
-        <MapContainer center={center} style={{ height: '100%', width: '100%' }}>
+        <MapContainer center={center} zoom={12} style={{ height: '100%', width: '100%' }}>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap contributors' />
           {markers.map((m, i) => (
             <Marker key={i} position={m.pos} icon={m.label === 'Towed To' ? redDivIcon : undefined}>
@@ -356,7 +371,7 @@ export default function TowingLocationMap({ from, to, height = '360px', fromCoor
           {route.length > 0 && (
             <Polyline positions={route} pathOptions={{ color: routeColor, weight: 5 }} />
           )}
-          <FitBounds coords={bounds} />
+          {bounds.length > 0 && <FitBounds coords={bounds} />}
         </MapContainer>
       </div>
 
